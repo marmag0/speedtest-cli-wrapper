@@ -5,12 +5,15 @@ Personally I run this wrapper on Proxmox home server - that's why main setup inc
 
 ## Setup
 
-1. create .env
+1. create `.env`
    1. come up with db credentails
-   2. get your SMTP credentials / `app password` (e.g. [Gmail SMTP Server](https://youtu.be/ZfEK3WP73eY?si=jEGLnbSB6VSbl-pP))
+   2. get your SMTP credentials - **app password** (e.g. [Gmail SMTP Server](https://youtu.be/ZfEK3WP73eY?si=jEGLnbSB6VSbl-pP))
 
 ```basic-example
-...
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=SuperStrongPassword
+POSTGRES_DB=speedtest-db
+SMTP_APP_PASSWD=SthStrongForSure
 ```
 
 2. run `docker-compose` (make sure you have [Docker](https://docs.docker.com/engine/install/))
