@@ -1,0 +1,82 @@
+services:
+  # service-1: speedtest-db
+  speedtest-db:
+    image: postgres:18.3-alpine3.23
+    container_name: speedtest-db
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - speedtest-db-data:/var/lib/postgresql/data
+    networks:
+      - speedtest-network
+
+  # service-2: migrator-db
+  migrator-db:
+    image: amacneil/dbmate:latest
+    container_name: migrator-db
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@speedtest-db:5432/${POSTGRES_DB}?sslmode=disable
+      DBMATE_MIGRATIONS_DIR: "/migrations"
+      DBMATE_NO_DUMP: true
+    command: ["--no-dump-schema", "up"]
+    volumes:
+      - ./migrations:/migrations
+    networks:
+      - speedtest-network
+    depends_on:
+      speedtest-db:
+        condition: service_healthy
+
+  # service-3: speedtest-py
+  speedtest-py:
+    build: .
+    container_name: speedtest-py
+    restart: unless-stopped
+    environment:
+      TZ: UTC
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@speedtest-db:5432/${POSTGRES_DB}?sslmode=disable
+    networks:
+      - speedtest-network
+      - ofelia-network
+    depends_on:
+      migrator-db:
+        condition: service_completed_successfully
+    labels:
+      - "ofelia.enabled=true"
+      # job 1: run every hour
+      - "ofelia.job-exec.speedtest-py.schedule=@hourly"
+      - "ofelia.job-exec.speedtest-py.command=python speedtest_app.py"
+      # job 2: run every month on the 1st at 00:30
+      - "ofelia.job-exec.speedtest-py.schedule=0 30 0 1 * *"
+      - "ofelia.job-exec.monthly-report.command=python monthly_report.py"
+
+  # service-4: ofelia
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: ofelia
+    restart: unless-stopped
+    depends_on:
+      - speedtest-py
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - ofelia-network
+
+volumes:
+  speedtest-db-data:
+
+networks:
+  speedtest-network:
+  ofelia-network:

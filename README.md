@@ -5,5 +5,8 @@ Personally I run this wrapper on Proxmox home server - that's why main setup inc
 
 ### System Design
 
-![System Desing Graph](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper.png)
+**Cloud Native Approach** - used here
+...
 
+**Python While True Loop Oriented Approach**
+![System Desing Graph](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper.png)
