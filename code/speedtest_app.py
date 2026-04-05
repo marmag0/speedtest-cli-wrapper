@@ -25,7 +25,7 @@ isp_id = None
 client_ip = None
 st_dict = None
 
-# speedtest module
+# module 1: speedtest 
 try:
     st = speedtest.Speedtest(secure=True)
     st.get_best_server()
@@ -49,8 +49,9 @@ except Exception as e:
     print(f"[!] {get_timestampz()}: Speedtest error: {e}")
 
 
-# saving to db module
+# module 2: saving to db
 try:
+    print(f"[*] {get_timestampz()}: Connecting and writing to database...")
     db_url = os.getenv("DATABASE_URL")
     if db_url:
         if db_url.startswith("postgres://"):
@@ -127,7 +128,7 @@ except Exception as e:
     print(f"[!] {get_timestampz()}: Database error: {e}")
 
 
-# debug log module
+# module 3: debug / log
 try:
     if is_successful:
         print(f"[*] Download: {download_speed:.2f} Mbps; Upload: {upload_speed:.2f} Mbps; Ping: {ping} ms")
