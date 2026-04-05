@@ -13,7 +13,12 @@ Personally I run this wrapper on Proxmox home server - that's why main setup inc
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=SuperStrongPassword
 POSTGRES_DB=speedtest-db
+
 SMTP_APP_PASSWD=SthStrongForSure
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=sender@addr.pl
+REPORT_RECIPIENT=target1@addr.pl, target2@addr.pl, ...
 ```
 
 2. Run `docker-compose` (make sure you have [Docker](https://docs.docker.com/engine/install/))
@@ -22,7 +27,13 @@ SMTP_APP_PASSWD=SthStrongForSure
 docker compose up --build
 ```
 
-3. That's it, everything works perfectly fine!
+3. That's it, everything works perfectly fine from this moment!
+
+4. If you're not sure if it really does, perform quick test:
+
+```bash
+...
+```
 
 ## System Design
 
