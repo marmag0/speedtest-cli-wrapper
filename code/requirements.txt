@@ -1,1 +1,3 @@
 speedtest-cli
+sqlalchemy
+psycopg2-binary

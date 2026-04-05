@@ -28,13 +28,13 @@ docker compose up --build
 
 ### Cloud Native Approach - used in this project
 
-**System Desing Schema**
-![Current System Desing Schema](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper-ofelia.png)
+**System Design Schema**
+![Current System Design Schema](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper-ofelia.png)
 
 **Services Hierarchy**
 ![Services Hierarchy Schema](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper-hierarchy.png)
 
 ### Python Loop Oriented Approach - not used in this project
 
-**System Desing Schema**
-![System Desing Schema](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper.png)
+**System Design Schema**
+![System Design Schema](https://marmag0.github.io/endpoints/speedtest-cli-wrapper/speedtest-cli-wrapper.png)

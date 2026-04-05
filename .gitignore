@@ -40,7 +40,6 @@ docker-compose.override.yml
 
 # PostgreSQL / Databases
 postgres-data/
-*.sql
 .env
 .env.local
 
