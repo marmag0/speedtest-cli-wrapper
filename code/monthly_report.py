@@ -138,7 +138,7 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
 
 
 
-def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
+def get_speedtest_values(db_url: str, cur_year: int, cur_month: int, min_down: int, min_up: int, max_ping: int) -> dict:
     engine = create_engine(db_url)
 
     with engine.begin() as conn:
@@ -193,10 +193,10 @@ def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
             FROM speedtests
             WHERE EXTRACT(YEAR FROM start_time) = :year 
               AND EXTRACT(MONTH FROM start_time) = :month
-              AND (download_speed <= 80 OR upload_speed <= 8 OR ping >= 100)
+              AND (download_speed <= :min_down OR upload_speed <= :min_up OR ping >= :max_ping)
             ORDER BY start_time DESC;
         """)
-        result_bad = conn.execute(query_bad_tests, {"year": cur_year, "month": cur_month}).fetchall()
+        result_bad = conn.execute(query_bad_tests, {"year": cur_year, "month": cur_month, "min_down": min_down, "min_up": min_up, "max_ping": max_ping}).fetchall()
         bad_tests_list = [
             {
                 "date": row.start_time.strftime("%Y-%m-%d %H:%M"), 
@@ -265,6 +265,8 @@ if __name__ == "__main__":
     print(f"[*] {get_timestampz()}: Starting reporting using Ofelia...")
 
     now = datetime.now()
+    #report_month = now.month
+    #report_year = now.year
     if now.month == 1:
         report_month = 12
         report_year = now.year - 1
@@ -299,7 +301,11 @@ if __name__ == "__main__":
     try:
         print(f"[*] {get_timestampz()}: Getting speedtest values from database...")
         
-        values_dict = get_speedtest_values(db_url, report_year, report_month)
+        min_down = int(os.getenv("MIN_DOWN", 0))
+        min_up = int(os.getenv("MIN_UP", 0))
+        max_ping = int(os.getenv("MAX_PING", 1000))
+
+        values_dict = get_speedtest_values(db_url, report_year, report_month, min_down=min_down, min_up=min_up, max_ping=max_ping)
 
     except Exception as e:
         print(f"[!] {get_timestampz()}: Database error: {e}")
@@ -333,8 +339,11 @@ if __name__ == "__main__":
     try:
         print(f"[*] {get_timestampz()}: Sending PDF via SMTP...")
         
-        recipient_str = os.getenv("REPORT_RECIPIENT")
+        recipient_str = os.getenv("REPORT_RECIPIENT", "")
         recipient_list = [email.strip() for email in recipient_str.split(',') if email.strip()]
+
+        if not recipient_list:
+            raise ValueError("REPORT_RECIPIENT is not set or empty!")
 
         send_report_email(report_path, recipient_list)
         
