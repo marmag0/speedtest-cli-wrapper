@@ -1,6 +1,8 @@
 import io
 import os
 import sys
+import smtplib
+from email.message import EmailMessage
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 
@@ -23,9 +25,9 @@ class SpeedtestReport(FPDF):
     def footer(self):
         self.set_y(-15)
         self.set_font("helvetica", "I", 8)
-        self.cell(0, 10, f"Strona {self.page_no()}", align="C")
+        self.cell(0, 10, f"Page {self.page_no()}", align="C")
 
-def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, ips: dict, servers: dict):
+def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, ips: dict, servers: dict) -> str:
     pdf = SpeedtestReport()
     pdf.add_page()
 
@@ -55,12 +57,12 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     
     pdf.set_font("helvetica", "", 12)
     pdf.cell(col_w, 10, f"Total: {stats['total']}", align="C")
-    pdf.cell(col_w, 10, f"Download: {stats['avg_down']:.2f} Mb/s", align="C")
+    pdf.cell(col_w, 10, f"Download: {stats['avg_down']:.2f} Mbps", align="C")
     pdf.cell(col_w, 10, f"{stats['avg_ping']:.3f} ms", new_x="LMARGIN", new_y="NEXT", align="C")
 
     pdf.set_font("helvetica", "", 12)
     pdf.cell(col_w, 10, f"Successful: {stats['successful']}", align="C")
-    pdf.cell(col_w, 10, f"Upload: {stats['avg_up']:.1f} Mb/s", align="C")
+    pdf.cell(col_w, 10, f"Upload: {stats['avg_up']:.1f} Mbps", align="C")
     pdf.cell(col_w, 10, f"", new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.ln(10)
 
@@ -105,13 +107,13 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     # 4. Table of contract violation records #
     # -------------------------------------- #
     pdf.set_font("helvetica", "B", 14)
-    pdf.cell(0, 10, "Speedtests violating contract guaranteed speed", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "Speedtest results not fulfiling contract requirements", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("helvetica", "", 10)
     
     with pdf.table(text_align="CENTER") as table:
         header = table.row()
-        for col_name in ["Date", "Download", "Upload", "Ping"]:
+        for col_name in ["Date", "Download (Mbps)", "Upload (Mbps)", "Ping (ms)"]:
             header.cell(col_name)
         
         for test in bad_tests:
@@ -124,9 +126,15 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     # ------------------------ #
     # 5. saving raport to file #
     # ------------------------ #
-    # TODO path management, logging to dedicated dir, returning file path
+    reports_dir = "reports"
+    
+    os.makedirs(reports_dir, exist_ok=True)
+    
     output_filename = f"report_{month_year.replace(' ', '_')}.pdf"
-    pdf.output(output_filename)
+    file_path = os.path.join(reports_dir, output_filename)
+    pdf.output(file_path)
+
+    return file_path
 
 
 
@@ -185,13 +193,12 @@ def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
             FROM speedtests
             WHERE EXTRACT(YEAR FROM start_time) = :year 
               AND EXTRACT(MONTH FROM start_time) = :month
-              AND (download_speed <= 140 OR upload_speed <= 14 OR ping >= 80)
+              AND (download_speed <= 80 OR upload_speed <= 8 OR ping >= 100)
             ORDER BY start_time DESC;
         """)
         result_bad = conn.execute(query_bad_tests, {"year": cur_year, "month": cur_month}).fetchall()
         bad_tests_list = [
             {
-                # Formatujemy datę do czytelnego stringa (bez sekund i strefy czasowej)
                 "date": row.start_time.strftime("%Y-%m-%d %H:%M"), 
                 "down": float(row.download_speed),
                 "up": float(row.upload_speed),
@@ -221,18 +228,49 @@ def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
 
 
 
+def send_report_email(pdf_path: str, recipient_emails: list):
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", 587))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_APP_PASSWD")
+
+    if not all([smtp_host, smtp_user, smtp_pass]):
+        raise ValueError("Missing SMTP environmental variables!")
+
+    msg = EmailMessage()
+    msg['Subject'] = f"Speedtest Report - {os.path.basename(pdf_path)}"
+    msg['From'] = smtp_user
+    msg['To'] = ", ".join(recipient_emails)
+
+    msg.set_content(
+        "Hey!\n\n"
+        "Here's your monthly Internet performance report - find it in attachement!\n\n"
+        "Best regards, your server <3"
+    )
+
+    with open(pdf_path, 'rb') as f:
+        pdf_data = f.read()
+        pdf_name = os.path.basename(pdf_path)
+
+    msg.add_attachment(pdf_data, maintype='application', subtype='pdf', filename=pdf_name)
+    
+    with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.send_message(msg)
+
+
+
 if __name__ == "__main__":
     print(f"[*] {get_timestampz()}: Starting reporting using Ofelia...")
 
     now = datetime.now()
-    report_month = now.month
-    report_year = now.year
-    #if now.month == 1:
-    #    report_month = 12
-    #    report_year = now.year - 1
-    #else:
-    #    report_month = now.month - 1
-    #    report_year = now.year
+    if now.month == 1:
+        report_month = 12
+        report_year = now.year - 1
+    else:
+        report_month = now.month - 1
+        report_year = now.year
 
 
     # module 1: getting database connection string from environmental variables
@@ -274,7 +312,7 @@ if __name__ == "__main__":
 
         months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 
-        generate_report(
+        report_path = generate_report(
             month_year=f"{months[report_month]} {report_year}",
             isps=values_dict["isps"],
             stats=values_dict["stats"],
@@ -287,8 +325,23 @@ if __name__ == "__main__":
         print(f"[!] {get_timestampz()}: Error during PDF generation: {e}")
         sys.exit(1)
 
+
     print(f"[+] {get_timestampz()}: PDF generated successfuly!")
 
+
     # module 4: sending report via SMTP
-    pass
+    try:
+        print(f"[*] {get_timestampz()}: Sending PDF via SMTP...")
+        
+        recipient_str = os.getenv("REPORT_RECIPIENT")
+        recipient_list = [email.strip() for email in recipient_str.split(',') if email.strip()]
+
+        send_report_email(report_path, recipient_list)
+        
+        print(f"[+] {get_timestampz()}: Report successfully sent to {len(recipient_list)} recipients!")
+        
+    except Exception as e:
+        print(f"[!] {get_timestampz()}: Error during sending report via SMTP: {e}")
+        sys.exit(1)
+        
 
