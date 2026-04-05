@@ -75,7 +75,7 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     fig1, ax1 = plt.subplots(figsize=fixed_fig_size)
     ax1.pie(ips.values(), labels=None, autopct=None, startangle=90, radius=1)
     ax1.set_title("Client's IP Addresses")
-    ax1.legend(ips.keys(), title="Adresy IP", loc="upper center", bbox_to_anchor=(0.5, -0.05))
+    ax1.legend(ips.keys(), title="IP Addresses", loc="upper center", bbox_to_anchor=(0.5, -0.05))
     
     fig1.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.35)
     
@@ -87,7 +87,7 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     fig2, ax2 = plt.subplots(figsize=fixed_fig_size)
     ax2.pie(servers.values(), labels=None, autopct=None, startangle=90, radius=1)
     ax2.set_title("Speedtest Servers")
-    ax2.legend(servers.keys(), title="Serwery", loc="upper center", bbox_to_anchor=(0.5, -0.05))
+    ax2.legend(servers.keys(), title="Servers", loc="upper center", bbox_to_anchor=(0.5, -0.05))
     
     fig2.subplots_adjust(left=0.05, right=0.95, top=0.9, bottom=0.35)
     
@@ -107,7 +107,7 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
     # 4. Table of contract violation records #
     # -------------------------------------- #
     pdf.set_font("helvetica", "B", 14)
-    pdf.cell(0, 10, "Speedtest results not fulfiling contract requirements", new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 10, "Speedtest results not fulfilling contract requirements", new_x="LMARGIN", new_y="NEXT")
     
     pdf.set_font("helvetica", "", 10)
     
@@ -124,7 +124,7 @@ def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, i
             row.cell(str(test['ping']))
 
     # ------------------------ #
-    # 5. saving raport to file #
+    # 5. saving report to file #
     # ------------------------ #
     reports_dir = "reports"
     
@@ -187,7 +187,7 @@ def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
         result_servers = conn.execute(query_servers, {"year": cur_year, "month": cur_month}).fetchall()
         servers_dict = {row.server_name: row.server_count for row in result_servers}
 
-        # select: speedtests not fulfiling contract requirements
+        # select: speedtests not fulfilling contract requirements
         query_bad_tests = text("""
             SELECT start_time, download_speed, upload_speed, ping
             FROM speedtests
@@ -244,7 +244,7 @@ def send_report_email(pdf_path: str, recipient_emails: list):
 
     msg.set_content(
         "Hey!\n\n"
-        "Here's your monthly Internet performance report - find it in attachement!\n\n"
+        "Here's your monthly Internet performance report - find it in attachment!\n\n"
         "Best regards, your server <3"
     )
 
@@ -326,7 +326,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
 
-    print(f"[+] {get_timestampz()}: PDF generated successfuly!")
+    print(f"[+] {get_timestampz()}: PDF generated successfully!")
 
 
     # module 4: sending report via SMTP

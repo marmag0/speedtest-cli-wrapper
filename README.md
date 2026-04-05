@@ -6,7 +6,7 @@ Personally I run this wrapper on Proxmox home server - that's why main setup inc
 ## Setup
 
 1. Create `.env`
-   1. come up with db credentails
+   1. come up with db credentials
    2. get your SMTP credentials - **app password** (e.g. [Gmail SMTP Server](https://youtu.be/ZfEK3WP73eY?si=jEGLnbSB6VSbl-pP))
 
 ```basic-example

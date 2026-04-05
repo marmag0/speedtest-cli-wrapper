@@ -50,7 +50,6 @@ services:
     environment:
       TZ: UTC
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@speedtest-db:5432/${POSTGRES_DB}?sslmode=disable
-      SMTP_APP_PASSWORD: ${SMTP_APP_PASSWD}
     networks:
       - speedtest-network
       - ofelia-network
