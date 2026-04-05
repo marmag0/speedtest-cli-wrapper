@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS speedtest_servers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     server_id INT UNIQUE NOT NULL,
     server_url TEXT NOT NULL,
+    server_name TEXT NOT NULL,
     server_country CHAR(2) NOT NULL,
     server_longitude NUMERIC(9, 6) NOT NULL,
     server_latitude NUMERIC(9, 6) NOT NULL

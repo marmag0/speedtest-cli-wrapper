@@ -1,3 +1,5 @@
 speedtest-cli
 sqlalchemy
 psycopg2-binary
+fpdf2
+matplotlib

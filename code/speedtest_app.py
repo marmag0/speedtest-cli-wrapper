@@ -85,8 +85,8 @@ try:
 
             # upsert: insert server if not exists, return id
             query_server = text("""
-                INSERT INTO speedtest_servers (server_id, server_url, server_country, server_longitude, server_latitude)
-                VALUES (:server_id, :server_url, :server_country, :server_lon, :server_lat)
+                INSERT INTO speedtest_servers (server_id, server_url, server_name, server_country, server_longitude, server_latitude)
+                VALUES (:server_id, :server_url, :server_name, :server_country, :server_lon, :server_lat)
                 ON CONFLICT (server_id) 
                 DO UPDATE SET server_id = EXCLUDED.server_id
                 RETURNING id;
@@ -94,6 +94,7 @@ try:
             server_id = conn.execute(query_server, {
                 "server_id": int(st_dict['server']['id']),
                 "server_url": st_dict['server']['url'],
+                "server_name": st_dict['server']['sponsor'],
                 "server_country": st_dict['server']['cc'],
                 "server_lon": float(st_dict['server']['lon']),
                 "server_lat": float(st_dict['server']['lat'])
