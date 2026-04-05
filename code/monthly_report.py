@@ -1,4 +1,6 @@
 import io
+import os
+import sys
 import matplotlib.pyplot as plt
 from fpdf import FPDF
 
@@ -23,7 +25,7 @@ class SpeedtestReport(FPDF):
         self.set_font("helvetica", "I", 8)
         self.cell(0, 10, f"Strona {self.page_no()}", align="C")
 
-def generate_report(month_year: str, isp_name: str, stats: dict, bad_tests: list, ips: dict, servers: dict):
+def generate_report(month_year: str, isps: list, stats: dict, bad_tests: list, ips: dict, servers: dict):
     pdf = SpeedtestReport()
     pdf.add_page()
 
@@ -36,7 +38,8 @@ def generate_report(month_year: str, isp_name: str, stats: dict, bad_tests: list
     pdf.cell(0, 10, f"Internet Performance Report - {month_year}", new_x="LMARGIN", new_y="NEXT", align="C")
     
     pdf.set_font("helvetica", "I", 14)
-    pdf.cell(0, 10, f"ISP: {isp_name}", new_x="LMARGIN", new_y="NEXT", align="C")
+    for isp_name in isps:
+        pdf.cell(0, 10, f"ISP: {isp_name}", new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.ln(10)
 
     # ----------- #
@@ -122,43 +125,170 @@ def generate_report(month_year: str, isp_name: str, stats: dict, bad_tests: list
     # 5. saving raport to file #
     # ------------------------ #
     # TODO path management, logging to dedicated dir, returning file path
-    output_filename = f"raport_{month_year.replace(' ', '_')}.pdf"
+    output_filename = f"report_{month_year.replace(' ', '_')}.pdf"
     pdf.output(output_filename)
-    print(f"[+] Raport generated: {output_filename}")
 
 
 
-pass
+def get_speedtest_values(db_url: str, cur_year: int, cur_month: int) -> dict:
+    engine = create_engine(db_url)
+
+    with engine.begin() as conn:
+        # select: getting speedtest count
+        query_stats = text("""
+            SELECT 
+                count(*) AS total,
+                count(*) FILTER (WHERE is_successful = TRUE) AS successful,
+                COALESCE(AVG(download_speed), 0) AS avg_down,
+                COALESCE(AVG(upload_speed), 0) AS avg_up,
+                COALESCE(AVG(ping), 0) AS avg_ping
+            FROM speedtests
+            WHERE EXTRACT(YEAR FROM start_time) = :year 
+              AND EXTRACT(MONTH FROM start_time) = :month; 
+        """)
+        row_stats = conn.execute(query_stats, {"year": cur_year, "month": cur_month}).fetchone()
+        stats_dict = {
+            "total": row_stats.total if row_stats else 0,
+            "successful": row_stats.successful if row_stats else 0,
+            "avg_down": float(row_stats.avg_down) if row_stats else 0.0,
+            "avg_up": float(row_stats.avg_up) if row_stats else 0.0,
+            "avg_ping": float(row_stats.avg_ping) if row_stats else 0.0
+        }
+        
+        # select: getting all client's IP addresses
+        query_ips = text("""
+            SELECT client_ip, count(client_ip) as ip_count
+            FROM speedtests
+            WHERE EXTRACT(YEAR FROM start_time) = :year 
+              AND EXTRACT(MONTH FROM start_time) = :month
+            GROUP BY client_ip
+        """)
+        result_ips = conn.execute(query_ips, {"year": cur_year, "month": cur_month}).fetchall()
+        ips_dict = {str(row.client_ip): row.ip_count for row in result_ips}
+
+        # select: getting all speedtest server names
+        query_servers = text("""
+            SELECT ss.server_name, count(ss.id) AS server_count
+            FROM speedtests AS s
+            JOIN speedtest_servers AS ss
+                ON s.server_id = ss.id
+            WHERE EXTRACT(YEAR FROM s.start_time) = :year 
+              AND EXTRACT(MONTH FROM s.start_time) = :month
+            GROUP BY ss.server_name;            
+        """)
+        result_servers = conn.execute(query_servers, {"year": cur_year, "month": cur_month}).fetchall()
+        servers_dict = {row.server_name: row.server_count for row in result_servers}
+
+        # select: speedtests not fulfiling contract requirements
+        query_bad_tests = text("""
+            SELECT start_time, download_speed, upload_speed, ping
+            FROM speedtests
+            WHERE EXTRACT(YEAR FROM start_time) = :year 
+              AND EXTRACT(MONTH FROM start_time) = :month
+              AND (download_speed <= 140 OR upload_speed <= 14 OR ping >= 80)
+            ORDER BY start_time DESC;
+        """)
+        result_bad = conn.execute(query_bad_tests, {"year": cur_year, "month": cur_month}).fetchall()
+        bad_tests_list = [
+            {
+                # Formatujemy datę do czytelnego stringa (bez sekund i strefy czasowej)
+                "date": row.start_time.strftime("%Y-%m-%d %H:%M"), 
+                "down": float(row.download_speed),
+                "up": float(row.upload_speed),
+                "ping": float(row.ping)
+            }
+            for row in result_bad
+        ]
+
+        # select: getting distinct ISPs for the given month
+        query_isps = text("""
+            SELECT DISTINCT i.isp_name
+            FROM speedtests s
+            JOIN isps i ON s.isp_id = i.id
+            WHERE EXTRACT(YEAR FROM s.start_time) = :year 
+              AND EXTRACT(MONTH FROM s.start_time) = :month;
+        """)
+        result_isps = conn.execute(query_isps, {"year": cur_year, "month": cur_month}).fetchall()
+        isps_list = [row.isp_name for row in result_isps]
+
+        return {
+            "stats": stats_dict,
+            "ips": ips_dict,
+            "servers": servers_dict,
+            "bad_tests": bad_tests_list,
+            "isps": isps_list
+        }
 
 
 
 if __name__ == "__main__":
-    # Dane testowe (jak poprzednio)
-    mock_stats = {
-        "total": 720,
-        "successful": 715,
-        "avg_down": 285.5,
-        "avg_up": 45.2,
-        "avg_ping": 14.2
-    }
-    
-    # Bardzo długie nazwy serwerów dla testu
-    mock_ips = {"91.123.181.242": 600, "91.123.181.200": 120}
-    mock_servers = {
-        "Exatel Warsaw (HQ Main)": 500, 
-        "Orange Warsaw (Secondary Backup)": 220
-    }
-    
-    mock_bad_tests = [
-        {"date": "2026-04-01 10:00", "down": 45.0, "up": 10.0, "ping": 120.5},
-        {"date": "2026-04-03 21:15", "down": 12.5, "up": 2.1, "ping": 300.0},
-    ]
+    print(f"[*] {get_timestampz()}: Starting reporting using Ofelia...")
 
-    generate_report(
-        month_year="Kwiecien 2026",
-        isp_name="Firma Handlowa Giga Arkadiusz Kocma",
-        stats=mock_stats,
-        bad_tests=mock_bad_tests,
-        ips=mock_ips,
-        servers=mock_servers
-    )
+    now = datetime.now()
+    report_month = now.month
+    report_year = now.year
+    #if now.month == 1:
+    #    report_month = 12
+    #    report_year = now.year - 1
+    #else:
+    #    report_month = now.month - 1
+    #    report_year = now.year
+
+
+    # module 1: getting database connection string from environmental variables
+    try:
+        print(f"[*] {get_timestampz()}: Getting environmental variables...")
+        db_url = os.getenv("DATABASE_URL")
+        if db_url:
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql://", 1)
+        else:
+            user = os.getenv("POSTGRES_USER")
+            password = os.getenv("POSTGRES_PASSWORD")
+            db_name = os.getenv("POSTGRES_DB")
+
+            if not all([user, password, db_name]):
+                raise ValueError("Not all environmental variables set!")
+
+            db_url = f"postgresql://{user}:{password}@speedtest-db:5432/{db_name}?sslmode=disable"
+    
+    except Exception as e:
+        print(f"[!] {get_timestampz()}: Environmental variables error: {e}")
+        sys.exit(1)
+
+    
+    # module 2: getting values from database
+    try:
+        print(f"[*] {get_timestampz()}: Getting speedtest values from database...")
+        
+        values_dict = get_speedtest_values(db_url, report_year, report_month)
+
+    except Exception as e:
+        print(f"[!] {get_timestampz()}: Database error: {e}")
+        sys.exit(1)
+
+
+    # module 3: generating PDF report
+    try:
+        print(f"[*] {get_timestampz()}: Generating PDF report...")
+
+        months = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
+
+        generate_report(
+            month_year=f"{months[report_month]} {report_year}",
+            isps=values_dict["isps"],
+            stats=values_dict["stats"],
+            bad_tests=values_dict["bad_tests"],
+            ips=values_dict["ips"],
+            servers=values_dict["servers"]
+        )
+        
+    except Exception as e:
+        print(f"[!] {get_timestampz()}: Error during PDF generation: {e}")
+        sys.exit(1)
+
+    print(f"[+] {get_timestampz()}: PDF generated successfuly!")
+
+    # module 4: sending report via SMTP
+    pass
+
