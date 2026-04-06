@@ -58,7 +58,7 @@ services:
     labels:
       - "ofelia.enabled=true"
       # job 1: run every hour
-      - "ofelia.job-exec.speedtest-py.schedule=@hourly"
+      - "ofelia.job-exec.speedtest-py.schedule=0 11 * * * *"
       - "ofelia.job-exec.speedtest-py.command=sh -c 'python speedtest_app.py'"
       # job 2: run every month on the 1st at 00:30
       - "ofelia.job-exec.monthly-report.schedule=0 30 0 1 * *"
