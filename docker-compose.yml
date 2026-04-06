@@ -52,7 +52,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@speedtest-db:5432/${POSTGRES_DB}?sslmode=disable
     networks:
       - speedtest-network
-      - ofelia-network
     depends_on:
       migrator-db:
         condition: service_completed_successfully
@@ -60,10 +59,10 @@ services:
       - "ofelia.enabled=true"
       # job 1: run every hour
       - "ofelia.job-exec.speedtest-py.schedule=@hourly"
-      - "ofelia.job-exec.speedtest-py.command=python speedtest_app.py"
+      - "ofelia.job-exec.speedtest-py.command=sh -c 'python speedtest_app.py'"
       # job 2: run every month on the 1st at 00:30
       - "ofelia.job-exec.monthly-report.schedule=0 30 0 1 * *"
-      - "ofelia.job-exec.monthly-report.command=python monthly_report.py"
+      - "ofelia.job-exec.monthly-report.command=sh -c 'python monthly_report.py'"
 
   # service-4: ofelia
   ofelia:
@@ -75,12 +74,9 @@ services:
     command: daemon --docker
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - ofelia-network
 
 volumes:
   speedtest-db-data:
 
 networks:
   speedtest-network:
-  ofelia-network:
